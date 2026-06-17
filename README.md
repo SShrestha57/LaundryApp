@@ -4,13 +4,13 @@ CSC336 Group Project
 
 # Team Members
 
-Alhassana Diallo
-Benny
-Sufyaan
-Pedro
-Yeasin Riyad
-Sangita Shrestha
-Jancarlos Jaquez
+1. Alhassana Diallo
+2. Benny
+3. Sufyaan
+4. Pedro
+5. Yeasin Riyad
+6. Sangita Shrestha
+7. Jancarlos Jaquez
 
 
 # Project Description
