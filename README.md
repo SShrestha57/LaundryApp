@@ -1,8 +1,8 @@
-LaundryApp
+# LaundryAp
 
 CSC336 Group Project
 
-Team Members
+# Team Members
 
 Alhassana Diallo
 Benny
@@ -13,11 +13,11 @@ Sangita Shrestha
 Jancarlos Jaquez
 
 
-Project Description
+# Project Description
 
 A SaaS platform that allows apartment tenants to reserve and pay for laundry machines while providing building managers with real-time machine availability and revenue tracking.
 
-Repository Structure
+# Repository Structure
 
 backend/ → Backend application code
 frontend/ → User interface code
