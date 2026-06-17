@@ -1,4 +1,4 @@
-# LaundryAp
+# LaundryApp
 
 CSC336 Group Project
 
@@ -19,7 +19,7 @@ A SaaS platform that allows apartment tenants to reserve and pay for laundry mac
 
 # Repository Structure
 
-backend/ → Backend application code
-frontend/ → User interface code
-database/ → Database schema, SQL scripts, and ER diagrams
-docs/ → Project documentation and reports
+1. backend/ → Backend application code
+2. frontend/ → User interface code
+3. database/ → Database schema, SQL scripts, and ER diagrams
+4. docs/ → Project documentation and reports
