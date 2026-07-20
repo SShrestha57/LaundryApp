@@ -93,3 +93,61 @@ BEGIN
     END IF;
 END //
 DELIMITER ;
+
+-- ---------------------------------------------------------------------
+-- TRIGGER 3 — prevent double-booking a machine on INSERT
+-- Blocks a new 'confirmed' row if it overlaps an existing 'confirmed'
+-- row on the same machine.
+-- ---------------------------------------------------------------------
+DROP TRIGGER IF EXISTS trg_booking_no_overlap_insert;
+DELIMITER //
+CREATE TRIGGER trg_booking_no_overlap_insert
+BEFORE INSERT ON bookings
+FOR EACH ROW
+BEGIN
+    DECLARE v_conflict_count INT DEFAULT 0;
+
+    IF NEW.booking_status = 'confirmed' THEN
+        SELECT COUNT(*) INTO v_conflict_count
+        FROM bookings
+        WHERE machine_id = NEW.machine_id
+          AND booking_status = 'confirmed'
+          AND start_time < NEW.end_time
+          AND end_time > NEW.start_time;
+
+        IF v_conflict_count > 0 THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'That machine is already booked during the requested time window';
+        END IF;
+    END IF;
+END //
+DELIMITER ;
+
+-- ---------------------------------------------------------------------
+-- TRIGGER 4 — prevent double-booking a machine on UPDATE
+-- Same check, but excludes the row being updated from the conflict scan.
+-- ---------------------------------------------------------------------
+DROP TRIGGER IF EXISTS trg_booking_no_overlap_update;
+DELIMITER //
+CREATE TRIGGER trg_booking_no_overlap_update
+BEFORE UPDATE ON bookings
+FOR EACH ROW
+BEGIN
+    DECLARE v_conflict_count INT DEFAULT 0;
+
+    IF NEW.booking_status = 'confirmed' THEN
+        SELECT COUNT(*) INTO v_conflict_count
+        FROM bookings
+        WHERE machine_id = NEW.machine_id
+          AND booking_status = 'confirmed'
+          AND booking_id <> OLD.booking_id
+          AND start_time < NEW.end_time
+          AND end_time > NEW.start_time;
+
+        IF v_conflict_count > 0 THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'That machine is already booked during the requested time window';
+        END IF;
+    END IF;
+END //
+DELIMITER ;
