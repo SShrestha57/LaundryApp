@@ -49,7 +49,7 @@ CREATE TABLE machines (
     building_id      INT NOT NULL,
     machine_number   INT NOT NULL,
     machine_type     VARCHAR(20)  NOT NULL,       -- 'washer' | 'dryer'
-    cost_per_cycle   DECIMAL(6,2) NOT NULL,
+    cost_per_cycle   DECIMAL(8,2) NOT NULL,
     duration_minutes INT NOT NULL,
     status           VARCHAR(30)  NOT NULL,       -- 'available' | 'in_use' | 'out_of_order'
     PRIMARY KEY (machine_id),
@@ -60,9 +60,9 @@ CREATE TABLE machines (
 -- 4) SUBSCRIPTION_PLANS (SaaS tiers buildings can buy)
 CREATE TABLE subscription_plans (
     plan_id            INT NOT NULL AUTO_INCREMENT,
-    plan_name          VARCHAR(50)  NOT NULL,
+    plan_name          VARCHAR(100) NOT NULL,
     billing_period     VARCHAR(20)  NOT NULL,     -- 'monthly' | 'yearly'
-    subscription_price DECIMAL(8,2) NOT NULL,
+    subscription_price DECIMAL(10,2) NOT NULL,
     max_machines       INT NOT NULL,
     analytics_level    VARCHAR(20)  NOT NULL,     -- 'basic' | 'advanced'
     PRIMARY KEY (plan_id)
@@ -90,7 +90,7 @@ CREATE TABLE bookings (
     machine_id       INT NOT NULL,
     start_time       DATETIME NOT NULL,
     end_time         DATETIME NOT NULL,
-    price_at_booking DECIMAL(6,2) NOT NULL,
+    price_at_booking DECIMAL(10,2) NOT NULL,
     booking_status   VARCHAR(20) NOT NULL,        -- 'pending' | 'confirmed' | 'completed' | 'cancelled'
     created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (booking_id),
@@ -104,12 +104,12 @@ CREATE TABLE bookings (
 CREATE TABLE booking_payments (
     payment_id           INT NOT NULL AUTO_INCREMENT,
     booking_id           INT NOT NULL,
-    gross_amount         DECIMAL(8,2) NOT NULL,   -- total the tenant paid
+    gross_amount         DECIMAL(10,2) NOT NULL,  -- total the tenant paid
     transaction_fee_rate DECIMAL(5,2) NOT NULL,   -- e.g. 0.1500 = 15%
-    transaction_fee      DECIMAL(8,2) NOT NULL,   -- app revenue
-    building_amount      DECIMAL(8,2) NOT NULL,   -- paid to the building
+    transaction_fee      DECIMAL(10,2) NOT NULL,  -- app revenue
+    building_amount      DECIMAL(10,2) NOT NULL,  -- paid to the building
     payment_status       VARCHAR(20)  NOT NULL,   -- 'paid' | 'pending' | 'refunded'
-    payment_date         DATETIME NOT NULL,
+    payment_date         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (payment_id),
     CONSTRAINT fk_bpay_booking
         FOREIGN KEY (booking_id) REFERENCES bookings (booking_id)
@@ -119,9 +119,9 @@ CREATE TABLE booking_payments (
 CREATE TABLE subscription_payments (
     subscription_payment_id INT NOT NULL AUTO_INCREMENT,
     subscription_id         INT NOT NULL,
-    amount                  DECIMAL(8,2) NOT NULL,
+    amount                  DECIMAL(10,2) NOT NULL,
     payment_status          VARCHAR(20)  NOT NULL,
-    payment_date            DATETIME NOT NULL,
+    payment_date            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     billing_period_start    DATE NOT NULL,
     billing_period_end      DATE NOT NULL,
     PRIMARY KEY (subscription_payment_id),
