@@ -8,7 +8,7 @@ from werkzeug.security import generate_password_hash
 
 import db
 
-DEMO_PASSWORD = "demo1234"
+DEMO_PASSWORD = "password123"
 FEE_RATE = 0.15  # app keeps 15% of each booking as a transaction fee
 
 TABLES = (
