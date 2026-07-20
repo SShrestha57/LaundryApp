@@ -1,2 +1,5 @@
 # Local credentials
 .env
+
+# macOS
+.DS_Store
