@@ -294,7 +294,7 @@ def create_booking():
 
     conflict = db.query(
         "SELECT booking_id FROM bookings "
-        "WHERE machine_id = %s AND booking_status = 'booked' "
+        "WHERE machine_id = %s AND booking_status = 'confirmed' "
         "AND start_time < %s AND end_time > %s",
         (data["machine_id"], data["end_time"], data["start_time"]),
         fetchone=True,

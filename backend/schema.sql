@@ -91,7 +91,7 @@ CREATE TABLE bookings (
     start_time       DATETIME NOT NULL,
     end_time         DATETIME NOT NULL,
     price_at_booking DECIMAL(6,2) NOT NULL,
-    booking_status   VARCHAR(20) NOT NULL,        -- 'booked' | 'completed' | 'cancelled'
+    booking_status   VARCHAR(20) NOT NULL,        -- 'pending' | 'confirmed' | 'completed' | 'cancelled'
     created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (booking_id),
     CONSTRAINT fk_bookings_user

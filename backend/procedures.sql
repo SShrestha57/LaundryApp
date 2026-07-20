@@ -53,7 +53,7 @@ BEGIN
     INSERT INTO bookings
         (user_id, machine_id, start_time, end_time, price_at_booking, booking_status)
     VALUES
-        (p_user_id, p_machine_id, p_start_time, p_end_time, p_price, 'booked');
+        (p_user_id, p_machine_id, p_start_time, p_end_time, p_price, 'confirmed');
 
     SELECT LAST_INSERT_ID() AS booking_id;
 END //
@@ -68,7 +68,7 @@ CREATE TRIGGER trg_booking_after_insert
 AFTER INSERT ON bookings
 FOR EACH ROW
 BEGIN
-    IF NEW.booking_status = 'booked' THEN
+    IF NEW.booking_status = 'confirmed' THEN
         UPDATE machines
         SET status = 'in_use'
         WHERE machine_id = NEW.machine_id;

@@ -105,11 +105,11 @@ def seed():
             (building_id, plan_id, start, end, status),
         )
 
-    # Bookings -> ids 1..5 (insert trigger sets machine in_use for 'booked')
+    # Bookings -> ids 1..5 (insert trigger sets machine in_use for 'confirmed')
     for user_id, machine_id, start, end, price, status in [
-        (1, 1, "2026-07-07 08:00:00", "2026-07-07 08:30:00", 2.50, "booked"),
+        (1, 1, "2026-07-07 08:00:00", "2026-07-07 08:30:00", 2.50, "confirmed"),
         (2, 2, "2026-07-07 09:00:00", "2026-07-07 09:45:00", 2.00, "completed"),
-        (4, 3, "2026-07-07 10:00:00", "2026-07-07 10:30:00", 3.00, "booked"),
+        (4, 3, "2026-07-07 10:00:00", "2026-07-07 10:30:00", 3.00, "confirmed"),
         (1, 5, "2026-07-08 11:00:00", "2026-07-08 11:35:00", 2.25, "completed"),
         (2, 1, "2026-07-08 12:00:00", "2026-07-08 12:30:00", 2.50, "cancelled"),
     ]:

@@ -32,7 +32,7 @@ def test_booking_with_invalid_user_id_rejected():
         db.execute(
             "INSERT INTO bookings (user_id, machine_id, start_time, end_time, "
             "price_at_booking, booking_status) VALUES (%s, %s, %s, %s, %s, %s)",
-            (999999, 1, "2026-08-01 09:00:00", "2026-08-01 09:30:00", 2.00, "booked"),
+            (999999, 1, "2026-08-01 09:00:00", "2026-08-01 09:30:00", 2.00, "confirmed"),
         )
 
 
@@ -42,7 +42,7 @@ def test_booking_with_invalid_machine_id_rejected():
         db.execute(
             "INSERT INTO bookings (user_id, machine_id, start_time, end_time, "
             "price_at_booking, booking_status) VALUES (%s, %s, %s, %s, %s, %s)",
-            (1, 999999, "2026-08-01 09:00:00", "2026-08-01 09:30:00", 2.00, "booked"),
+            (1, 999999, "2026-08-01 09:00:00", "2026-08-01 09:30:00", 2.00, "confirmed"),
         )
 
 
