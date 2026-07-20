@@ -291,6 +291,17 @@ def create_booking():
     """
     data = get_body()
     require(data, "user_id", "machine_id", "start_time", "end_time", "price_at_booking")
+
+    conflict = db.query(
+        "SELECT booking_id FROM bookings "
+        "WHERE machine_id = %s AND booking_status = 'booked' "
+        "AND start_time < %s AND end_time > %s",
+        (data["machine_id"], data["end_time"], data["start_time"]),
+        fetchone=True,
+    )
+    if conflict:
+        raise ApiError(409, "machine already booked for that time")
+
     rows = db.call_procedure(
         "sp_book_machine",
         (
@@ -340,6 +351,8 @@ def create_booking_payment():
     data = get_body()
     require(data, "booking_id", "gross_amount")
     gross = float(data["gross_amount"])
+    if gross <= 0:
+        raise ApiError(400, "gross_amount must be positive")
     rate = float(data.get("transaction_fee_rate", DEFAULT_FEE_RATE))
     fee = round(gross * rate, 2)
     building_amount = round(gross - fee, 2)
