@@ -33,7 +33,7 @@ CREATE TABLE users (
     user_id       INT NOT NULL AUTO_INCREMENT,
     building_id   INT NOT NULL,
     name          VARCHAR(100) NOT NULL,
-    email         VARCHAR(100) NOT NULL,
+    email         VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     role          VARCHAR(20)  NOT NULL,          -- 'tenant' | 'manager'
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -51,7 +51,7 @@ CREATE TABLE machines (
     machine_type     VARCHAR(20)  NOT NULL,       -- 'washer' | 'dryer'
     cost_per_cycle   DECIMAL(6,2) NOT NULL,
     duration_minutes INT NOT NULL,
-    status           VARCHAR(20)  NOT NULL,       -- 'available' | 'in_use' | 'out_of_order'
+    status           VARCHAR(30)  NOT NULL,       -- 'available' | 'in_use' | 'out_of_order'
     PRIMARY KEY (machine_id),
     CONSTRAINT fk_machines_building
         FOREIGN KEY (building_id) REFERENCES buildings (building_id)
@@ -105,7 +105,7 @@ CREATE TABLE booking_payments (
     payment_id           INT NOT NULL AUTO_INCREMENT,
     booking_id           INT NOT NULL,
     gross_amount         DECIMAL(8,2) NOT NULL,   -- total the tenant paid
-    transaction_fee_rate DECIMAL(5,4) NOT NULL,   -- e.g. 0.1500 = 15%
+    transaction_fee_rate DECIMAL(5,2) NOT NULL,   -- e.g. 0.1500 = 15%
     transaction_fee      DECIMAL(8,2) NOT NULL,   -- app revenue
     building_amount      DECIMAL(8,2) NOT NULL,   -- paid to the building
     payment_status       VARCHAR(20)  NOT NULL,   -- 'paid' | 'pending' | 'refunded'
