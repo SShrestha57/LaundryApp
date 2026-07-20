@@ -1,7 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 
-	const API_URL = 'http://localhost:5001';
+	const API_URL = 'http://127.0.0.1:5001';
 
 	let currentPage = $state('home');
 	let showLogin = $state(false);
@@ -140,7 +140,7 @@
 						: '♨️',
 
 				status:
-					machine.status === 'available'
+					machine.status === 'active'
 						? 'Available'
 						: machine.status === 'in_use'
 							? 'In Use'
@@ -149,7 +149,7 @@
 								: 'Reserved',
 
 				detail:
-					machine.status === 'available'
+					machine.status === 'active'
 						? `${machine.duration_minutes} minutes · $${Number(
 								machine.cost_per_cycle
 							).toFixed(2)}`
@@ -828,7 +828,7 @@
 			<input
 				id="email"
 				type="email"
-				placeholder="adiallo@citymail.cuny.edu"
+				placeholder="pedro.tenant@example.com"
 				bind:value={email}
 			/>
 
