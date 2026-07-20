@@ -45,6 +45,8 @@ def _handle_db_error(exc):
         return jsonify(error="that value already exists (duplicate)"), 409
     if getattr(exc, "errno", None) == 1452:
         return jsonify(error="referenced record does not exist"), 400
+    if getattr(exc, "errno", None) == 1644:
+        return jsonify(error=getattr(exc, "msg", str(exc))), 400
     return jsonify(error="database error", detail=str(exc)), 400
 
 
@@ -183,7 +185,7 @@ def create_machine():
         (
             data["building_id"], data["machine_number"], data["machine_type"],
             data["cost_per_cycle"], data["duration_minutes"],
-            data.get("status", "available"),
+            data.get("status", "active"),
         ),
     )
     return jsonify(machine_id=result["lastrowid"]), 201
@@ -193,7 +195,7 @@ def create_machine():
 def update_machine_status(machine_id):
     data = get_body()
     require(data, "status")
-    allowed = {"available", "in_use", "out_of_order"}
+    allowed = {"active", "maintenance"}
     if data["status"] not in allowed:
         raise ApiError(400, "status must be one of: " + ", ".join(sorted(allowed)))
     result = db.execute(
@@ -287,7 +289,8 @@ def list_bookings():
 def create_booking():
     """Create a booking via the sp_book_machine stored procedure.
 
-    The AFTER INSERT trigger flips the machine to 'in_use'.
+    A BEFORE INSERT trigger validates the booking (same building,
+    machine operational, no overlapping reservation).
     """
     data = get_body()
     require(data, "user_id", "machine_id", "start_time", "end_time", "price_at_booking")

@@ -63,14 +63,14 @@ def seed():
             (building_id, name, email, pw, role),
         )
 
-    # Machines -> ids 1..6
+    # Machines -> ids 1..6 (status is operational state: 'active' | 'maintenance')
     for building_id, num, mtype, cost, duration, status in [
-        (1, 1, "washer", 2.50, 30, "available"),
-        (1, 2, "dryer", 2.00, 45, "available"),
-        (2, 1, "washer", 3.00, 30, "available"),
-        (2, 2, "dryer", 2.75, 40, "available"),
-        (3, 1, "washer", 2.25, 35, "available"),
-        (3, 2, "dryer", 2.25, 40, "available"),
+        (1, 1, "washer", 2.50, 30, "active"),
+        (1, 2, "dryer", 2.00, 45, "active"),
+        (2, 1, "washer", 3.00, 30, "active"),
+        (2, 2, "dryer", 2.75, 40, "active"),
+        (3, 1, "washer", 2.25, 35, "active"),
+        (3, 2, "dryer", 2.25, 40, "maintenance"),
     ]:
         db.execute(
             "INSERT INTO machines "
@@ -105,12 +105,13 @@ def seed():
             (building_id, plan_id, start, end, status),
         )
 
-    # Bookings -> ids 1..5 (insert trigger sets machine in_use for 'confirmed')
+    # Bookings -> ids 1..5 (before-insert trigger checks same building,
+    # machine 'active', valid status, and no overlap)
     for user_id, machine_id, start, end, price, status in [
         (1, 1, "2026-07-07 08:00:00", "2026-07-07 08:30:00", 2.50, "confirmed"),
         (2, 2, "2026-07-07 09:00:00", "2026-07-07 09:45:00", 2.00, "completed"),
         (4, 3, "2026-07-07 10:00:00", "2026-07-07 10:30:00", 3.00, "confirmed"),
-        (1, 5, "2026-07-08 11:00:00", "2026-07-08 11:35:00", 2.25, "completed"),
+        (5, 5, "2026-07-08 11:00:00", "2026-07-08 11:35:00", 2.25, "completed"),
         (2, 1, "2026-07-08 12:00:00", "2026-07-08 12:30:00", 2.50, "cancelled"),
     ]:
         db.execute(

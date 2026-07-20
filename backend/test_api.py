@@ -65,25 +65,27 @@ def test_duplicate_email_returns_409(client):
     assert res.status_code == 409
 
 
-def test_booking_triggers_machine_status(client):
+def test_booking_respects_machine_operational_status(client):
+    # A booking on an operational ('active') machine succeeds. Machine status is
+    # operational state, not availability, so it stays 'active' after booking.
     created = client.post("/bookings", json={
         "user_id": 1, "machine_id": 2,
         "start_time": "2026-07-09 08:00:00", "end_time": "2026-07-09 08:30:00",
         "price_at_booking": 2.00,
     })
     assert created.status_code == 201
-    booking_id = created.get_json()["booking_id"]
 
     machines = client.get("/machines?building_id=1").get_json()
     m2 = next(m for m in machines if m["machine_id"] == 2)
-    assert m2["status"] == "in_use"
+    assert m2["status"] == "active"
 
-    cancelled = client.delete(f"/bookings/{booking_id}")
-    assert cancelled.status_code == 200
-
-    machines = client.get("/machines?building_id=1").get_json()
-    m2 = next(m for m in machines if m["machine_id"] == 2)
-    assert m2["status"] == "available"
+    # A booking on a machine under maintenance is rejected by the DB trigger.
+    rejected = client.post("/bookings", json={
+        "user_id": 5, "machine_id": 6,
+        "start_time": "2026-07-09 10:00:00", "end_time": "2026-07-09 10:30:00",
+        "price_at_booking": 2.00,
+    })
+    assert rejected.status_code == 400
 
 
 def test_booking_payment_splits_fee(client):
@@ -118,67 +120,20 @@ def test_excel_export(client):
 
 
 def test_double_booking_same_machine_overlap(client):
-    """Edge case: does the app stop two overlapping bookings on the same machine?"""
+    """Two overlapping bookings on the same machine must be rejected."""
     first = client.post("/bookings", json={
-        "user_id": 1, "machine_id": 3,
+        "user_id": 4, "machine_id": 3,
         "start_time": "2026-07-10 09:00:00", "end_time": "2026-07-10 09:30:00",
         "price_at_booking": 2.00,
     })
     assert first.status_code == 201
 
     second = client.post("/bookings", json={
-        "user_id": 2, "machine_id": 3,
+        "user_id": 3, "machine_id": 3,
         "start_time": "2026-07-10 09:10:00", "end_time": "2026-07-10 09:40:00",
         "price_at_booking": 2.00,
     })
-    # If this prints 201, the app currently allows double-booking - a real bug worth flagging.
-    print(f"Second overlapping booking status: {second.status_code}")
-    assert second.status_code in (201, 409)
-
-
-def test_cancel_nonexistent_booking_returns_404(client):
-    res = client.delete("/bookings/999999")
-    assert res.status_code == 404
-
-
-def test_invalid_machine_status_rejected(client):
-    res = client.patch("/machines/1", json={"status": "not_a_real_status"})
-    assert res.status_code == 400
-
-
-def test_negative_payment_amount_rejected(client):
-    res = client.post("/booking-payments", json={
-        "booking_id": 2, "gross_amount": -5.00,
-    })
-    assert res.status_code == 400
-
-
-def test_booking_missing_machine_id_returns_400(client):
-    res = client.post("/bookings", json={
-        "user_id": 1,
-        "start_time": "2026-07-11 09:00:00", "end_time": "2026-07-11 09:30:00",
-        "price_at_booking": 2.00,
-    })
-    assert res.status_code == 400
-
-
-def test_double_booking_same_machine_overlap(client):
-    """Edge case: does the app stop two overlapping bookings on the same machine?"""
-    first = client.post("/bookings", json={
-        "user_id": 1, "machine_id": 3,
-        "start_time": "2026-07-10 09:00:00", "end_time": "2026-07-10 09:30:00",
-        "price_at_booking": 2.00,
-    })
-    assert first.status_code == 201
-
-    second = client.post("/bookings", json={
-        "user_id": 2, "machine_id": 3,
-        "start_time": "2026-07-10 09:10:00", "end_time": "2026-07-10 09:40:00",
-        "price_at_booking": 2.00,
-    })
-    # If this prints 201, the app currently allows double-booking - a real bug worth flagging.
-    print(f"Second overlapping booking status: {second.status_code}")
-    assert second.status_code in (201, 409)
+    assert second.status_code == 409
 
 
 def test_cancel_nonexistent_booking_returns_404(client):

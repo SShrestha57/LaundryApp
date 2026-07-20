@@ -51,7 +51,7 @@ CREATE TABLE machines (
     machine_type     VARCHAR(20)  NOT NULL,       -- 'washer' | 'dryer'
     cost_per_cycle   DECIMAL(8,2) NOT NULL,
     duration_minutes INT NOT NULL,
-    status           VARCHAR(30)  NOT NULL,       -- 'available' | 'in_use' | 'out_of_order'
+    status           VARCHAR(30)  NOT NULL,       -- 'active' | 'maintenance'
     PRIMARY KEY (machine_id),
     CONSTRAINT fk_machines_building
         FOREIGN KEY (building_id) REFERENCES buildings (building_id)
