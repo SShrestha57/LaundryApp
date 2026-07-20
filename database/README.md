@@ -4,9 +4,11 @@ This folder contains the MySQL database implementation for LaundryApp.
 
 ## Files
 
-- `schema.sql` creates the database tables and relationships.
-- `sample_data.sql` inserts sample records for testing.
+- `schema.sql` creates the eight database tables and their relationships.
+- `sample_data.sql` inserts development sample records for testing.
 - `queries.sql` contains tested SQL queries used by the application.
+- `procedures.sql` creates stored procedures and booking validation triggers.
+- `indexes_views.sql` creates performance indexes and reusable views.
 
 ## Requirements
 
