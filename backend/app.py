@@ -125,15 +125,15 @@ def login():
     data = get_body()
     require(data, "email", "password")
     user = db.query(
-        "SELECT user_id, name, email, role, password_hash FROM users WHERE email = %s",
+        "SELECT user_id, building_id, name, email, role, password_hash FROM users WHERE email = %s",
         (data["email"],),
         fetchone=True,
     )
     if not user or not check_password_hash(user["password_hash"], data["password"]):
         return jsonify(error="invalid email or password"), 401
     return jsonify(
-        user_id=user["user_id"], name=user["name"],
-        email=user["email"], role=user["role"],
+        user_id=user["user_id"], building_id=user["building_id"],
+        name=user["name"], email=user["email"], role=user["role"],
     )
 
 
