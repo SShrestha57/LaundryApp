@@ -242,8 +242,10 @@ def create_plan():
 def list_subscriptions():
     return jsonify(
         db.query(
-            "SELECT bs.subscription_id, bl.name AS building, p.plan_name, "
-            "p.subscription_price, bs.start_date, bs.end_date, bs.subscription_status "
+            "SELECT bs.subscription_id, bs.building_id, bl.name AS building, "
+            "p.plan_name, p.billing_period, p.subscription_price, "
+            "p.analytics_level, bs.start_date, bs.end_date, "
+            "bs.subscription_status "
             "FROM building_subscriptions bs "
             "JOIN buildings bl ON bs.building_id = bl.building_id "
             "JOIN subscription_plans p ON bs.plan_id = p.plan_id "
@@ -287,33 +289,61 @@ def list_bookings():
 
 @app.post("/bookings")
 def create_booking():
-    """Create a booking via the sp_book_machine stored procedure.
+    """Create a booking using the sp_book_machine stored procedure."""
 
     A BEFORE INSERT trigger validates the booking (same building,
     machine operational, no overlapping reservation).
     """
     data = get_body()
-    require(data, "user_id", "machine_id", "start_time", "end_time", "price_at_booking")
+
+    require(
+        data,
+        "user_id",
+        "machine_id",
+        "start_time",
+        "end_time",
+        "price_at_booking",
+    )
 
     conflict = db.query(
         "SELECT booking_id FROM bookings "
-        "WHERE machine_id = %s AND booking_status = 'confirmed' "
-        "AND start_time < %s AND end_time > %s",
-        (data["machine_id"], data["end_time"], data["start_time"]),
+        "WHERE machine_id = %s "
+        "AND booking_status = 'confirmed' "
+        "AND start_time < %s "
+        "AND end_time > %s",
+        (
+            data["machine_id"],
+            data["end_time"],
+            data["start_time"],
+        ),
         fetchone=True,
     )
-    if conflict:
-        raise ApiError(409, "machine already booked for that time")
 
-    rows = db.call_procedure(
-        "sp_book_machine",
-        (
-            data["user_id"], data["machine_id"], data["start_time"],
-            data["end_time"], data["price_at_booking"],
-        ),
-    )
-    booking_id = rows[0]["booking_id"] if rows else None
-    return jsonify(booking_id=booking_id), 201
+    if conflict:
+        raise ApiError(
+            409,
+            "machine already booked for that time",
+        )
+
+    try:
+        rows = db.call_procedure(
+            "sp_book_machine",
+            (
+                data["user_id"],
+                data["machine_id"],
+                data["start_time"],
+                data["end_time"],
+                data["price_at_booking"],
+            ),
+        )
+
+        booking_id = rows[0]["booking_id"] if rows else None
+
+        return jsonify(booking_id=booking_id), 201
+
+    except Exception as error:
+        print("BOOKING ERROR:", repr(error))
+        return jsonify(error=str(error)), 400
 
 
 @app.delete("/bookings/<int:booking_id>")

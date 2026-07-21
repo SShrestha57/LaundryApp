@@ -12,8 +12,14 @@
 	let email = $state('');
 	let password = $state('');
 	let userId = $state(null);
-	let userName = $state('');
-
+    let userName = $state('');
+    let userRole = $state('');
+    
+    let managerMachines = $state([]);
+    let managerBookings = $state([]);
+    let managerRevenue = $state(null);
+    let managerSubscription = $state(null);
+    
 	let selectedMachine = $state(null);
 	let selectedDate = $state('');
 	let selectedTime = $state('');
@@ -79,6 +85,7 @@
 
 			userId = data.user_id;
 			userName = data.name;
+            userRole = data.role;
 			isLoggedIn = true;
 			showLogin = false;
 			password = '';
@@ -86,7 +93,16 @@
 			message = `Welcome, ${data.name}! You are logged in.`;
 
 			await loadMachines();
-			await loadBookings();
+            
+            if (userRole === 'manager') {
+                await loadManagerRevenue();
+                await loadManagerSubscription();
+                currentPage = 'manager';
+            } else {
+                await loadBookings();
+                currentPage = 'home';
+            }
+
 		} catch (error) {
 			message = error.message;
 		} finally {
@@ -98,6 +114,7 @@
 		isLoggedIn = false;
 		userId = null;
 		userName = '';
+        userRole = '';
 		email = '';
 		password = '';
 		bookings = [];
@@ -162,12 +179,57 @@
 				duration: machine.duration_minutes,
 				price: Number(machine.cost_per_cycle)
 			}));
+
+			managerMachines = machines;
 		} catch (error) {
 			message = error.message;
 		} finally {
 			loading = false;
 		}
 	}
+
+    async function loadManagerRevenue() {
+	try {
+		const response = await fetch(`${API_URL}/reports/revenue`);
+		const data = await response.json();
+
+		if (!response.ok) {
+			throw new Error(data.error || 'Could not load revenue.');
+		}
+
+		const buildingReport = data.find(
+			(row) => Number(row.building_id) === 1
+		);
+
+		managerRevenue = buildingReport || {
+			booking_revenue: 0,
+			subscription_revenue: 0
+		};
+	} catch (error) {
+		message = error.message;
+		managerRevenue = null;
+	}
+}
+
+    async function loadManagerSubscription() {
+        try {
+            const response = await fetch(`${API_URL}/subscriptions`);
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Could not load subscription.');
+            }
+            
+            const buildingSubscription = data.find(
+                (row) => Number(row.building_id) === 1
+            );
+            
+            managerSubscription = buildingSubscription || null;
+        } catch (error) {
+            message = error.message;
+            managerSubscription = null;
+        }
+    }
 
 	async function loadBookings() {
 		if (!userId) {
@@ -459,15 +521,20 @@
 		<button onclick={() => changePage('home')}>
 			Home
 		</button>
-
-		<button onclick={() => changePage('machines')}>
-			Machines
-		</button>
-
-		<button onclick={() => changePage('bookings')}>
-			My Bookings
-		</button>
-
+        <button onclick={() => changePage('machines')}>
+             Machines
+            </button>
+            
+            {#if isLoggedIn && userRole === 'manager'}
+            <button onclick={() => changePage('manager')}>
+                Manager Dashboard
+             </button>
+             {/if}
+		{#if !isLoggedIn || userRole === 'tenant'}
+			<button onclick={() => changePage('bookings')}>
+				My Bookings
+			</button>
+		{/if}
 		{#if isLoggedIn}
 			<span class="welcome">Hi, {userName}</span>
 
@@ -805,6 +872,181 @@
 				</div>
 			{/if}
 		</section>
+	{/if}
+
+	{#if currentPage === 'manager'}
+		{#if !isLoggedIn || userRole !== 'manager'}
+			<section class="page-section">
+				<div class="empty">
+					<div class="empty-icon">🔒</div>
+					<h2>Manager access required</h2>
+					<p>Log in with a manager account to open this dashboard.</p>
+					<button class="primary" onclick={openLogin}>Log In</button>
+				</div>
+			</section>
+		{:else}
+			<section class="page-section">
+				<div class="section-header">
+					<div>
+						<p class="eyebrow">MANAGER CONTROL CENTER</p>
+						<h1>Manager Dashboard</h1>
+						<p class="dashboard-intro">
+							Monitor machines, reservations, revenue sharing, and the building subscription.
+						</p>
+					</div>
+					<button
+                    class="refresh-button"
+                    onclick={async () => {
+                        await loadMachines();
+                        await loadManagerRevenue();
+                        await loadManagerSubscription();
+                        }}
+                        >
+                        Refresh Data
+                    </button>
+				</div>
+
+				<div class="dashboard-stats">
+					<article class="dashboard-stat">
+						<span>Total Machines</span>
+						<strong>{managerMachines.length}</strong>
+						<small>Registered in building 1</small>
+					</article>
+
+					<article class="dashboard-stat">
+						<span>Available Now</span>
+						<strong>
+							{managerMachines.filter((machine) => machine.status === 'Available').length}
+						</strong>
+						<small>Ready for tenant booking</small>
+					</article>
+
+					<article class="dashboard-stat">
+						<span>Maintenance</span>
+						<strong>
+							{managerMachines.filter((machine) => machine.status === 'Maintenance').length}
+						</strong>
+						<small>Machines requiring attention</small>
+					</article>
+
+					<article class="dashboard-stat">
+						<span>Transaction Fee</span>
+						<strong>5%</strong>
+						<small>$0.15 developer fee on a $3.00 cycle</small>
+					</article>
+				</div>
+
+				<div class="dashboard-grid">
+					<article class="dashboard-card dashboard-wide">
+						<div class="card-heading">
+							<div>
+								<p class="eyebrow">LIVE DATABASE DATA</p>
+								<h2>Machine Inventory</h2>
+							</div>
+							<button class="secondary" onclick={() => changePage('machines')}>
+								Open Machine View
+							</button>
+						</div>
+
+						<div class="manager-machine-list">
+							{#each managerMachines as machine}
+								<div class="manager-machine-row">
+									<div>
+										<strong>{machine.icon} {machine.name}</strong>
+										<span>{machine.duration} minutes · ${machine.price.toFixed(2)}</span>
+									</div>
+									<span
+										class:available={machine.status === 'Available'}
+										class:unavailable={machine.status !== 'Available'}
+										class="status"
+									>
+										{machine.status}
+									</span>
+								</div>
+							{/each}
+						</div>
+					</article>
+
+					<article class="dashboard-card">
+						<p class="eyebrow">REVENUE MODEL</p>
+						<h2>Booking Revenue Split</h2>
+                        {#if managerRevenue}
+                        <div class="revenue-example">
+                            <div>
+                                <span>Developer booking fees</span>
+                                <strong>
+                                    ${Number(managerRevenue.booking_revenue || 0).toFixed(2)}
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Subscription revenue</span>
+                                <strong>
+                                    ${Number(managerRevenue.subscription_revenue || 0).toFixed(2)}
+                                </strong>
+                            </div>
+                            
+                            <div>
+                                <span>Total platform revenue</span>
+                                <strong>
+                                    ${(
+                                        Number(managerRevenue.booking_revenue || 0) +
+                                        Number(managerRevenue.subscription_revenue || 0)
+                                        ).toFixed(2)}
+                                    </strong>
+                                </div>
+                            </div>
+                        {:else}
+                        <p class="muted">No revenue information is available yet.</p>
+                        {/if}
+						
+						<p class="muted">
+							The final database stores gross amount, fee rate, transaction fee, and building amount in BOOKING_PAYMENTS.
+						</p>
+					</article>
+
+					<article class="dashboard-card">
+						<p class="eyebrow">SAAS SUBSCRIPTION</p>
+						<h2>Building Plan</h2>
+                        {#if managerSubscription}
+                        <div class="subscription-summary">
+                            <p>
+                                <span>Plan</span>
+                                <strong>{managerSubscription.plan_name}</strong>
+                            </p>
+
+                            <p>
+                                <span>Billing</span>
+                                <strong>{managerSubscription.billing_period}</strong>
+                            </p>
+
+                            <p>
+                                <span>Price</span>
+                                <strong>
+                                    ${Number(managerSubscription.subscription_price || 0).toFixed(2)}
+                                </strong>
+                            </p>
+                            
+                            <p>
+                                <span>Status</span>
+                                <strong>{managerSubscription.subscription_status}</strong>
+                            </p>
+
+                            <p>
+                                <span>Analytics</span>
+                                <strong>{managerSubscription.analytics_level}</strong>
+                            </p>
+                        </div>  
+                    {:else}
+                        <p class="muted">No building subscription information is available.</p>
+                    {/if}
+						<p class="muted">
+							Subscription plans, building subscriptions, and subscription payments are represented in the final schema.
+						</p>
+					</article>
+				</div>
+			</section>
+		{/if}
 	{/if}
 </main>
 
@@ -1402,6 +1644,126 @@
 		margin: 7px 0;
 	}
 
+
+	.dashboard-intro {
+		max-width: 720px;
+		margin: -18px 0 0;
+		color: #6e879c;
+		line-height: 1.6;
+	}
+
+	.dashboard-stats {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 18px;
+		margin-bottom: 24px;
+	}
+
+	.dashboard-stat,
+	.dashboard-card {
+		border: 1px solid #d4e2eb;
+		border-radius: 18px;
+		background: white;
+		box-shadow: 0 8px 24px rgba(37, 76, 110, 0.06);
+	}
+
+	.dashboard-stat {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 24px;
+	}
+
+	.dashboard-stat span,
+	.dashboard-stat small,
+	.muted {
+		color: #738da2;
+	}
+
+	.dashboard-stat strong {
+		font-size: 32px;
+		color: #087caf;
+	}
+
+	.dashboard-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 20px;
+	}
+
+	.dashboard-card {
+		padding: 28px;
+	}
+
+	.dashboard-card h2 {
+		margin: 10px 0 22px;
+	}
+
+	.dashboard-wide {
+		grid-column: 1 / -1;
+	}
+
+	.card-heading {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 18px;
+	}
+
+	.manager-machine-list {
+		display: grid;
+		gap: 12px;
+		margin-top: 20px;
+	}
+
+	.manager-machine-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 18px;
+		padding: 16px;
+		border: 1px solid #e1ebf1;
+		border-radius: 12px;
+		background: #f8fbfd;
+	}
+
+	.manager-machine-row div {
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+	}
+
+	.manager-machine-row span {
+		color: #738da2;
+	}
+
+	.revenue-example,
+	.subscription-summary {
+		display: grid;
+		gap: 12px;
+	}
+
+	.revenue-example div,
+	.subscription-summary p {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+		margin: 0;
+		padding: 14px 0;
+		border-bottom: 1px solid #e1ebf1;
+	}
+
+	.revenue-example strong,
+	.subscription-summary strong {
+		color: #087caf;
+	}
+
+	.muted {
+		margin-top: 20px;
+		line-height: 1.6;
+	}
+
 	@media (max-width: 1050px) {
 		.hero {
 			grid-template-columns: 1fr;
@@ -1414,6 +1776,10 @@
 
 		.booking-card {
 			grid-template-columns: 1fr 1fr;
+		}
+
+		.dashboard-stats {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
 	}
 
@@ -1442,6 +1808,21 @@
 
 		.booking-card {
 			grid-template-columns: 1fr;
+		}
+
+		.dashboard-stats,
+		.dashboard-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.dashboard-wide {
+			grid-column: auto;
+		}
+
+		.card-heading,
+		.manager-machine-row {
+			align-items: flex-start;
+			flex-direction: column;
 		}
 
 		.section-header {
