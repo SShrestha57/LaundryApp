@@ -19,7 +19,7 @@
 	let userName = $state('');
 	let userRole = $state('');
 	let userBuildingId = $state(1);
-	let signup = $state({ name: '', email: '', phone: '', card: '', building: '' });
+	let signup = $state({ name: '', email: '', phone: '', card: '', building: '', password: '' });
 	let pricingAudience = $state('landlord');
 	let selectedMachine = $state(null);
 	let selectedDate = $state('');
@@ -28,8 +28,16 @@
 	let bookings = $state([]);
 	let managerRevenue = $state(null);
 	let managerSubscription = $state(null);
+	let buildingOptions = $state([]);
+	let plans = $state([]);
 
-	onMount(loadMachines);
+	onMount(init);
+
+	async function init() {
+		await loadMachines();
+		loadBuildings();
+		loadPlans();
+	}
 
 	function changePage(page) {
 		currentPage = page;
@@ -78,15 +86,28 @@
 		finally { loading = false; }
 	}
 
-	function createAccount() {
-		if (!signup.name || !signup.email || !signup.phone || !signup.building) {
-			message = 'Please complete your contact details and select your building.';
+	async function createAccount() {
+		if (!signup.name || !signup.email || !signup.password || !signup.building) {
+			message = 'Please add your name, email, password, and building.';
 			return;
 		}
-		message = `Thanks, ${signup.name.split(' ')[0]}! Your resident account request for ${signup.building} is ready for setup.`;
-		authMode = 'signin';
-		email = signup.email;
-		password = '';
+		loading = true;
+		message = '';
+		try {
+			const response = await fetch(`${API_URL}/users`, {
+				method: 'POST', headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ building_id: Number(signup.building), name: signup.name, email: signup.email, password: signup.password, role: 'tenant' })
+			});
+			const data = await response.json();
+			if (!response.ok) throw new Error(data.error || 'Could not create your account.');
+			email = signup.email;
+			authMode = 'signin';
+			authAudience = 'resident';
+			signup = { name: '', email: '', phone: '', card: '', building: '', password: '' };
+			password = '';
+			message = 'Account created. You can sign in now.';
+		} catch (error) { message = error.message; }
+		finally { loading = false; }
 	}
 
 	function logout() {
@@ -145,7 +166,8 @@
 		try {
 			const response = await fetch(`${API_URL}/subscriptions`); const data = await response.json();
 			if (!response.ok) throw new Error(data.error || 'Could not load subscription.');
-			managerSubscription = data.find((row) => Number(row.building_id) === userBuildingId) || null;
+			const mine = data.filter((row) => Number(row.building_id) === userBuildingId);
+			managerSubscription = mine.length ? mine[mine.length - 1] : null;
 		} catch (error) { managerSubscription = null; }
 	}
 
@@ -156,6 +178,66 @@
 		document.body.appendChild(link);
 		link.click();
 		link.remove();
+	}
+
+	async function loadBuildings() {
+		try {
+			const response = await fetch(`${API_URL}/buildings`);
+			const data = await response.json();
+			if (response.ok) buildingOptions = data;
+		} catch (error) { /* signup form stays usable even if this fails */ }
+	}
+
+	async function loadPlans() {
+		try {
+			const response = await fetch(`${API_URL}/plans`);
+			const data = await response.json();
+			if (response.ok) plans = data;
+		} catch (error) { /* pricing still renders without live plans */ }
+	}
+
+	async function toggleMachine(machine) {
+		const next = machine.status === 'Maintenance' ? 'active' : 'maintenance';
+		loading = true;
+		try {
+			const response = await fetch(`${API_URL}/machines/${machine.id}`, {
+				method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ status: next })
+			});
+			const data = await response.json();
+			if (!response.ok) throw new Error(data.error || 'Could not update the machine.');
+			await loadDashboard();
+			message = `${machine.name} is now ${next === 'active' ? 'available' : 'in maintenance'}.`;
+		} catch (error) { message = error.message; }
+		finally { loading = false; }
+	}
+
+	async function subscribe(plan) {
+		if (!isLoggedIn || userRole !== 'manager') { openAuth('signin', 'manager'); return; }
+		if (!plan) { message = 'That plan is not available right now.'; return; }
+		loading = true;
+		try {
+			const today = new Date().toISOString().slice(0, 10);
+			const response = await fetch(`${API_URL}/subscriptions`, {
+				method: 'POST', headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ building_id: userBuildingId, plan_id: plan.plan_id, start_date: today })
+			});
+			const data = await response.json();
+			if (!response.ok) throw new Error(data.error || 'Could not start the subscription.');
+			await loadManagerSubscription();
+			changePage('dashboard');
+			message = `Your building is now subscribed to ${plan.plan_name}.`;
+		} catch (error) { message = error.message; }
+		finally { loading = false; }
+	}
+
+	async function recordBookingPayment(bookingId, amount) {
+		try {
+			await fetch(`${API_URL}/booking-payments`, {
+				method: 'POST', headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ booking_id: bookingId, gross_amount: amount })
+			});
+		} catch (error) { /* the booking still succeeded even if the payment record fails */ }
 	}
 
 	function reserve(machine) {
@@ -175,7 +257,8 @@
 			const response = await fetch(`${API_URL}/bookings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId, machine_id: selectedMachine.id, start_time: formatForBackend(startDate), end_time: formatForBackend(endDate), price_at_booking: selectedMachine.price }) });
 			const data = await response.json();
 			if (!response.ok) throw new Error(data.error || 'Could not confirm the reservation.');
-			closeReservation(); await loadBookings(); await loadMachines(); changePage('bookings'); message = 'Your laundry time is confirmed.';
+			if (data.booking_id) await recordBookingPayment(data.booking_id, selectedMachine.price);
+			closeReservation(); await loadBookings(); await loadMachines(); changePage('bookings'); message = 'Your laundry time is confirmed and paid.';
 		} catch (error) { message = error.message; }
 		finally { loading = false; }
 	}
@@ -238,13 +321,13 @@
 	{:else if currentPage === 'bookings'}
 		<section class="page wrap" in:fade={{ duration: 220 }}><div class="section-intro"><p class="kicker">Resident account</p><h1>Your laundry schedule.</h1><p>Everything you have booked, all in one place.</p></div>{#if !isLoggedIn}<div class="empty-state"><div class="empty-icon">◉</div><h2>Your next wash is waiting.</h2><p>Sign in to view, manage, and reserve your building’s machines.</p><button class="button" onclick={() => openAuth('signin', 'resident')}>Sign in as resident</button></div>{:else if bookings.length === 0 && !loading}<div class="empty-state"><div class="empty-icon">◎</div><h2>Nothing booked yet.</h2><p>Choose an available machine and make the time yours.</p><button class="button" onclick={() => changePage('machines')}>Find a machine</button></div>{:else}<div class="booking-list">{#each bookings as booking}<article class="booking-card" transition:fly={{ y: 12, duration: 180 }}><div class="booking-main"><span class="confirmed">{booking.status}</span><h2>{booking.machine}</h2><p>{booking.date} · {booking.time}–{booking.endTime}</p></div><div class="booking-price"><span>Paid</span><b>${booking.price}</b></div>{#if booking.status !== 'Cancelled' && booking.status !== 'Completed'}<button class="cancel-button" onclick={() => cancelBooking(booking)}>Cancel</button>{/if}</article>{/each}</div>{/if}</section>
 	{:else if currentPage === 'pricing'}
-		<section class="page pricing-page" in:fade={{ duration: 220 }}><div class="wrap"><div class="section-intro centered"><p class="kicker">One service, two experiences</p><h1>Built for better laundry days.</h1><p>Rinse gives property teams control behind the scenes and residents an easy way to get laundry done.</p></div><div class="audience-toggle"><button class:chosen={pricingAudience === 'landlord'} onclick={() => (pricingAudience = 'landlord')}>For properties</button><button class:chosen={pricingAudience === 'resident'} onclick={() => (pricingAudience = 'resident')}>For residents</button></div>{#if pricingAudience === 'landlord'}<div class="pricing-grid"><article class="price-card"><p class="plan-label">Starter</p><h2>Small buildings,<br />big relief.</h2><div class="price"><b>$79</b><span>/ month</span></div><p class="price-copy">For properties with up to 25 machines.</p><ul><li>Resident booking portal</li><li>Machine status overview</li><li>Flexible per-machine pricing</li><li>Monthly revenue summary</li></ul><button class="button full-width" onclick={() => openAuth('signin', 'manager')}>Property team sign in</button></article><article class="price-card featured"><span class="popular">Most popular</span><p class="plan-label">Growth</p><h2>Made for a<br />fuller building.</h2><div class="price"><b>$149</b><span>/ month</span></div><p class="price-copy">For communities with up to 75 machines.</p><ul><li>Everything in Starter</li><li>Performance analytics</li><li>Automated resident reminders</li><li>Priority support</li></ul><button class="button full-width" onclick={() => openAuth('signin', 'manager')}>Talk to us <span>→</span></button></article><article class="price-card"><p class="plan-label">Portfolio</p><h2>For every<br />building you run.</h2><div class="price"><b>Let’s talk</b></div><p class="price-copy">Custom rollout for multi-property teams.</p><ul><li>Everything in Growth</li><li>Multi-building management</li><li>Custom reporting</li><li>Dedicated onboarding</li></ul><button class="outline-button full-width" onclick={() => openAuth('signin', 'manager')}>Contact sales</button></article></div><p class="pricing-note">All plans include secure resident payments. Machine cycle prices are set by your property team.</p>{:else}<div class="resident-price"><div><p class="plan-label">For residents</p><h2>Your building sets the price. We make it simple.</h2><p>There’s no Rinse subscription for residents. Create a free account, select your building, and pay only for the washer or dryer cycle you reserve.</p><button class="button" onclick={() => openAuth('signup', 'resident')}>Create free account <span>→</span></button></div><div class="resident-receipt"><p>Example booking</p><div><span>Washer 04 · 35 min</span><b>$2.50</b></div><div><span>Service fee</span><b>$0.00</b></div><hr /><div class="total"><span>Total today</span><b>$2.50</b></div><small>Cycle prices vary by building and are set by its property team.</small></div></div>{/if}</div></section>
+		<section class="page pricing-page" in:fade={{ duration: 220 }}><div class="wrap"><div class="section-intro centered"><p class="kicker">One service, two experiences</p><h1>Built for better laundry days.</h1><p>Rinse gives property teams control behind the scenes and residents an easy way to get laundry done.</p></div><div class="audience-toggle"><button class:chosen={pricingAudience === 'landlord'} onclick={() => (pricingAudience = 'landlord')}>For properties</button><button class:chosen={pricingAudience === 'resident'} onclick={() => (pricingAudience = 'resident')}>For residents</button></div>{#if pricingAudience === 'landlord'}<div class="pricing-grid"><article class="price-card"><p class="plan-label">Starter</p><h2>Small buildings,<br />big relief.</h2><div class="price"><b>$79</b><span>/ month</span></div><p class="price-copy">For properties with up to 25 machines.</p><ul><li>Resident booking portal</li><li>Machine status overview</li><li>Flexible per-machine pricing</li><li>Monthly revenue summary</li></ul><button class="button full-width" onclick={() => subscribe(plans[0])}>{isLoggedIn && userRole === 'manager' ? `Subscribe to ${plans[0]?.plan_name ?? 'Basic'}` : 'Property team sign in'}</button></article><article class="price-card featured"><span class="popular">Most popular</span><p class="plan-label">Growth</p><h2>Made for a<br />fuller building.</h2><div class="price"><b>$149</b><span>/ month</span></div><p class="price-copy">For communities with up to 75 machines.</p><ul><li>Everything in Starter</li><li>Performance analytics</li><li>Automated resident reminders</li><li>Priority support</li></ul><button class="button full-width" onclick={() => subscribe(plans[1])}>{isLoggedIn && userRole === 'manager' ? `Subscribe to ${plans[1]?.plan_name ?? 'Pro'}` : 'Talk to us'} <span>→</span></button></article><article class="price-card"><p class="plan-label">Portfolio</p><h2>For every<br />building you run.</h2><div class="price"><b>Let’s talk</b></div><p class="price-copy">Custom rollout for multi-property teams.</p><ul><li>Everything in Growth</li><li>Multi-building management</li><li>Custom reporting</li><li>Dedicated onboarding</li></ul><button class="outline-button full-width" onclick={() => subscribe(plans[2])}>{isLoggedIn && userRole === 'manager' ? `Subscribe to ${plans[2]?.plan_name ?? 'Enterprise'}` : 'Contact sales'}</button></article></div><p class="pricing-note">All plans include secure resident payments. Machine cycle prices are set by your property team.</p>{:else}<div class="resident-price"><div><p class="plan-label">For residents</p><h2>Your building sets the price. We make it simple.</h2><p>There’s no Rinse subscription for residents. Create a free account, select your building, and pay only for the washer or dryer cycle you reserve.</p><button class="button" onclick={() => openAuth('signup', 'resident')}>Create free account <span>→</span></button></div><div class="resident-receipt"><p>Example booking</p><div><span>Washer 04 · 35 min</span><b>$2.50</b></div><div><span>Service fee</span><b>$0.00</b></div><hr /><div class="total"><span>Total today</span><b>$2.50</b></div><small>Cycle prices vary by building and are set by its property team.</small></div></div>{/if}</div></section>
 	{:else if currentPage === 'dashboard'}
-		<section class="page wrap dashboard" in:fade={{ duration: 220 }}>{#if !isLoggedIn || userRole !== 'manager'}<div class="empty-state"><div class="empty-icon">▦</div><h2>Property team access only.</h2><p>Sign in with your developer or admin account to manage your building.</p><button class="button" onclick={() => openAuth('signin', 'manager')}>Property team sign in</button></div>{:else}<div class="dashboard-heading"><div><p class="kicker">{managerRevenue?.building || 'Property'} · Property workspace</p><h1>Good morning, {userName}.</h1><p>Here’s what is happening in your laundry room today.</p></div><button class="icon-button" onclick={loadDashboard}>↻ Refresh data</button></div><div class="metric-grid"><article><span>Available now</span><b>{machines.filter((machine) => machine.status === 'Available').length}<small> / {machines.length} machines</small></b><p class="positive">● Healthy availability</p></article><article><span>Maintenance</span><b>{machines.filter((machine) => machine.status === 'Maintenance').length}</b><p>Machines requiring attention</p></article><article><span>Booking fees</span><b>${Number(managerRevenue?.booking_revenue || 0).toFixed(2)}</b><p>Platform revenue to date</p></article><article><span>Current plan</span><b class="plan-value">{managerSubscription?.plan_name || 'Starter'}</b><p>{managerSubscription?.billing_period || 'Monthly billing'}</p></article></div><div class="dashboard-panels"><article class="panel inventory"><div class="panel-heading"><div><p class="plan-label">Machine control</p><h2>Machine inventory</h2></div><button class="text-button" onclick={() => changePage('machines')}>Open resident view →</button></div>{#each machines as machine}<div class="inventory-row"><div class="machine-symbol small-symbol {machine.type.toLowerCase()}">{machine.icon}</div><div><b>{machine.name}</b><span>{machine.duration} min · ${machine.price.toFixed(2)} per cycle</span></div><span class:available={machine.status === 'Available'} class="status">{machine.status}</span><button class="row-action">Manage</button></div>{/each}</article><article class="panel revenue"><p class="plan-label">Revenue</p><h2>At a glance</h2><div class="revenue-number">${(Number(managerRevenue?.booking_revenue || 0) + Number(managerRevenue?.subscription_revenue || 0)).toFixed(2)}</div><p>Total platform revenue recorded for this building.</p><div class="revenue-bars"><span style="height: 34%"></span><span style="height: 56%"></span><span style="height: 42%"></span><span style="height: 74%"></span><span style="height: 62%"></span><span style="height: 88%"></span><span style="height: 76%"></span></div><button class="outline-button full-width" onclick={exportRevenue}>View full reports</button></article></div>{/if}</section>
+		<section class="page wrap dashboard" in:fade={{ duration: 220 }}>{#if !isLoggedIn || userRole !== 'manager'}<div class="empty-state"><div class="empty-icon">▦</div><h2>Property team access only.</h2><p>Sign in with your developer or admin account to manage your building.</p><button class="button" onclick={() => openAuth('signin', 'manager')}>Property team sign in</button></div>{:else}<div class="dashboard-heading"><div><p class="kicker">{managerRevenue?.building || 'Property'} · Property workspace</p><h1>Good morning, {userName}.</h1><p>Here’s what is happening in your laundry room today.</p></div><button class="icon-button" onclick={loadDashboard}>↻ Refresh data</button></div><div class="metric-grid"><article><span>Available now</span><b>{machines.filter((machine) => machine.status === 'Available').length}<small> / {machines.length} machines</small></b><p class="positive">● Healthy availability</p></article><article><span>Maintenance</span><b>{machines.filter((machine) => machine.status === 'Maintenance').length}</b><p>Machines requiring attention</p></article><article><span>Booking fees</span><b>${Number(managerRevenue?.booking_revenue || 0).toFixed(2)}</b><p>Platform revenue to date</p></article><article><span>Current plan</span><b class="plan-value">{managerSubscription?.plan_name || 'Starter'}</b><p>{managerSubscription?.billing_period || 'Monthly billing'}</p></article></div><div class="dashboard-panels"><article class="panel inventory"><div class="panel-heading"><div><p class="plan-label">Machine control</p><h2>Machine inventory</h2></div><button class="text-button" onclick={() => changePage('machines')}>Open resident view →</button></div>{#each machines as machine}<div class="inventory-row"><div class="machine-symbol small-symbol {machine.type.toLowerCase()}">{machine.icon}</div><div><b>{machine.name}</b><span>{machine.duration} min · ${machine.price.toFixed(2)} per cycle</span></div><span class:available={machine.status === 'Available'} class="status">{machine.status}</span><button class="row-action" onclick={() => toggleMachine(machine)}>{machine.status === 'Maintenance' ? 'Set available' : 'Set maintenance'}</button></div>{/each}</article><article class="panel revenue"><p class="plan-label">Revenue</p><h2>At a glance</h2><div class="revenue-number">${(Number(managerRevenue?.booking_revenue || 0) + Number(managerRevenue?.subscription_revenue || 0)).toFixed(2)}</div><p>Total platform revenue recorded for this building.</p><div class="revenue-bars"><span style="height: 34%"></span><span style="height: 56%"></span><span style="height: 42%"></span><span style="height: 74%"></span><span style="height: 62%"></span><span style="height: 88%"></span><span style="height: 76%"></span></div><button class="outline-button full-width" onclick={exportRevenue}>View full reports</button></article></div>{/if}</section>
 	{/if}
 </main>
 
-{#if showAuth}<div class="modal-backdrop" transition:fade={{ duration: 160 }} role="presentation"><div class="auth-modal" transition:fly={{ y: 18, duration: 220 }} role="dialog" aria-modal="true"><button class="close" onclick={closeAuth} aria-label="Close">×</button><div class="auth-title"><p class="kicker">{authMode === 'signup' ? 'Resident account' : authAudience === 'manager' ? 'Property workspace' : 'Welcome back'}</p><h2>{authMode === 'signup' ? 'Laundry on your terms.' : authAudience === 'manager' ? 'Manage your building.' : 'Good to see you.'}</h2><p>{authMode === 'signup' ? 'Create your free account in a few quick steps.' : authAudience === 'manager' ? 'Use your developer or admin credentials.' : 'Sign in to book your next laundry time.'}</p></div>{#if authMode === 'signin'}<div class="role-switch"><button class:chosen={authAudience === 'resident'} onclick={() => (authAudience = 'resident')}>Resident</button><button class:chosen={authAudience === 'manager'} onclick={() => (authAudience = 'manager')}>Developer / admin</button></div><label>Email<input type="email" bind:value={email} placeholder={authAudience === 'manager' ? 'admin@property.com' : 'you@example.com'} /></label><label>Password<input type="password" bind:value={password} placeholder="Enter password" /></label><button class="button full-width" onclick={login} disabled={loading}>{loading ? 'Signing in…' : `Sign in as ${authAudience === 'manager' ? 'property team' : 'resident'}`} <span>→</span></button>{#if authAudience === 'resident'}<p class="auth-footer">New to Rinse? <button onclick={() => (authMode = 'signup')}>Create an account</button></p>{/if}{:else}<div class="form-grid"><label>Full name<input bind:value={signup.name} placeholder="Maya Carter" /></label><label>Email<input type="email" bind:value={signup.email} placeholder="maya@email.com" /></label><label>Mobile number<input type="tel" bind:value={signup.phone} placeholder="(555) 000-0000" /></label><label>Building<select bind:value={signup.building}><option value="">Choose your building</option>{#each buildings as building}<option>{building}</option>{/each}</select></label></div><label>Card number <span class="optional">(optional for now)</span><input bind:value={signup.card} inputmode="numeric" placeholder="•••• •••• •••• 1234" /></label><button class="button full-width" onclick={createAccount}>Create resident account <span>→</span></button><p class="auth-footer">Already have an account? <button onclick={() => (authMode = 'signin')}>Sign in</button></p>{/if}{#if message}<p class="form-message">{message}</p>{/if}</div></div>{/if}
+{#if showAuth}<div class="modal-backdrop" transition:fade={{ duration: 160 }} role="presentation"><div class="auth-modal" transition:fly={{ y: 18, duration: 220 }} role="dialog" aria-modal="true"><button class="close" onclick={closeAuth} aria-label="Close">×</button><div class="auth-title"><p class="kicker">{authMode === 'signup' ? 'Resident account' : authAudience === 'manager' ? 'Property workspace' : 'Welcome back'}</p><h2>{authMode === 'signup' ? 'Laundry on your terms.' : authAudience === 'manager' ? 'Manage your building.' : 'Good to see you.'}</h2><p>{authMode === 'signup' ? 'Create your free account in a few quick steps.' : authAudience === 'manager' ? 'Use your developer or admin credentials.' : 'Sign in to book your next laundry time.'}</p></div>{#if authMode === 'signin'}<div class="role-switch"><button class:chosen={authAudience === 'resident'} onclick={() => (authAudience = 'resident')}>Resident</button><button class:chosen={authAudience === 'manager'} onclick={() => (authAudience = 'manager')}>Developer / admin</button></div><label>Email<input type="email" bind:value={email} placeholder={authAudience === 'manager' ? 'admin@property.com' : 'you@example.com'} /></label><label>Password<input type="password" bind:value={password} placeholder="Enter password" /></label><button class="button full-width" onclick={login} disabled={loading}>{loading ? 'Signing in…' : `Sign in as ${authAudience === 'manager' ? 'property team' : 'resident'}`} <span>→</span></button>{#if authAudience === 'resident'}<p class="auth-footer">New to Rinse? <button onclick={() => (authMode = 'signup')}>Create an account</button></p>{/if}{:else}<div class="form-grid"><label>Full name<input bind:value={signup.name} placeholder="Maya Carter" /></label><label>Email<input type="email" bind:value={signup.email} placeholder="maya@email.com" /></label><label>Mobile number<input type="tel" bind:value={signup.phone} placeholder="(555) 000-0000" /></label><label>Building<select bind:value={signup.building}><option value="">Choose your building</option>{#each buildingOptions as b}<option value={b.building_id}>{b.name}</option>{/each}</select></label></div><label>Password<input type="password" bind:value={signup.password} placeholder="Create a password" /></label><label>Card number <span class="optional">(optional for now)</span><input bind:value={signup.card} inputmode="numeric" placeholder="•••• •••• •••• 1234" /></label><button class="button full-width" onclick={createAccount}>Create resident account <span>→</span></button><p class="auth-footer">Already have an account? <button onclick={() => (authMode = 'signin')}>Sign in</button></p>{/if}{#if message}<p class="form-message">{message}</p>{/if}</div></div>{/if}
 
 {#if showReservation && selectedMachine}<div class="modal-backdrop" transition:fade={{ duration: 160 }} role="presentation"><div class="auth-modal reservation-modal" transition:fly={{ y: 18, duration: 220 }} role="dialog" aria-modal="true"><button class="close" onclick={closeReservation} aria-label="Close">×</button><p class="kicker">Reserve a machine</p><h2>{selectedMachine.name}</h2><div class="reservation-summary"><span class="machine-symbol {selectedMachine.type.toLowerCase()}">{selectedMachine.icon}</span><div><b>{selectedMachine.duration} minute cycle</b><span>Pay now · guaranteed time</span></div><strong>${selectedMachine.price.toFixed(2)}</strong></div><div class="form-grid"><label>Date<input type="date" bind:value={selectedDate} /></label><label>Start time<select bind:value={selectedTime}><option value="">Select a time</option>{#each ['8:00 AM','9:00 AM','10:00 AM','11:00 AM','12:00 PM','1:00 PM','2:00 PM','3:00 PM','4:00 PM','5:00 PM','6:00 PM','7:00 PM'] as time}<option>{time}</option>{/each}</select></label></div><button class="button full-width" onclick={confirmReservation} disabled={loading}>{loading ? 'Confirming…' : `Pay $${selectedMachine.price.toFixed(2)} & reserve`} <span>→</span></button>{#if message}<p class="form-message">{message}</p>{/if}</div></div>{/if}
 
