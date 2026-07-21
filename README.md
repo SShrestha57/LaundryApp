@@ -89,9 +89,9 @@ WashWise uses two revenue streams:
 
 Example for a $3.00 laundry cycle:
 
-- Building share: $2.85
-- Application developer fee: $0.15
-- Transaction fee rate: 5%
+- Building share: $2.55
+- Application developer fee: $0.45
+- Transaction fee rate: 15%
 
 The database stores the revenue split in the `booking_payments` table.
 
@@ -123,7 +123,7 @@ The data model is normalized to at least Second Normal Form.
 Email:
 
 ```text
-maya.manager@example.com
+jcarter@example.com
 ```
 
 Password:
@@ -137,7 +137,7 @@ password123
 Email:
 
 ```text
-pedro.tenant@example.com
+wchen@example.com
 ```
 
 Password:
@@ -192,7 +192,7 @@ Open MySQL Workbench.
 The database name is:
 
 ```sql
-laundry_app
+washwise
 ```
 
 Run the SQL files in this order:
@@ -203,14 +203,16 @@ Run the SQL files in this order:
 3. backend/indexes_views.sql
 ```
 
-After running the SQL files, load the sample data using `seed.py`.
+All three SQL files are required. The automated tests depend on the
+stored procedures, triggers, indexes, and views created by these files.
+
 
 ## Step 2: Configure the Backend
 
 Open a terminal in the project folder:
 
 ```bash
-cd ~/Desktop/LaundryApp/backend
+cd ~/Desktop/LaundryApp-main/backend
 ```
 
 Create and activate the Python virtual environment:
@@ -241,10 +243,40 @@ DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=your_mysql_password
-DB_NAME=laundry_app
+DB_NAME=washwise
 ```
 
 Do not upload the `.env` file to GitHub.
+
+Load the demonstration data:
+
+```bash
+python3 seed.py
+```
+
+Run the automated backend and database tests:
+
+```bash
+pytest test_api.py test_db.py -v
+```
+
+A successful setup should report:
+
+```text
+22 passed
+```
+
+After the tests pass, start the Flask backend:
+
+```bash
+python3 app.py
+```
+
+The backend should run at:
+
+```text
+http://127.0.0.1:5001
+```
 
 ## Step 3: Load the Demo Data
 
