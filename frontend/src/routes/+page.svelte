@@ -13,6 +13,7 @@
 	let password = $state('');
 	let userId = $state(null);
 	let userName = $state('');
+	let userBuildingId = $state(1);
 
 	let selectedMachine = $state(null);
 	let selectedDate = $state('');
@@ -79,6 +80,7 @@
 
 			userId = data.user_id;
 			userName = data.name;
+			userBuildingId = data.building_id;
 			isLoggedIn = true;
 			showLogin = false;
 			password = '';
@@ -97,6 +99,7 @@
 	function logout() {
 		isLoggedIn = false;
 		userId = null;
+		userBuildingId = 1;
 		userName = '';
 		email = '';
 		password = '';
@@ -110,7 +113,7 @@
 
 		try {
 			const response = await fetch(
-				`${API_URL}/machines?building_id=1`
+				`${API_URL}/machines?building_id=${userBuildingId}`
 			);
 
 			const data = await response.json();
@@ -142,22 +145,14 @@
 				status:
 					machine.status === 'active'
 						? 'Available'
-						: machine.status === 'in_use'
-							? 'In Use'
-							: machine.status === 'maintenance'
-								? 'Maintenance'
-								: 'Reserved',
+						: 'Maintenance',
 
 				detail:
 					machine.status === 'active'
 						? `${machine.duration_minutes} minutes · $${Number(
 								machine.cost_per_cycle
 							).toFixed(2)}`
-						: machine.status === 'in_use'
-							? 'Currently in use'
-							: machine.status === 'maintenance'
-								? 'Under maintenance'
-								: 'Currently reserved',
+						: 'Under maintenance',
 
 				duration: machine.duration_minutes,
 				price: Number(machine.cost_per_cycle)
