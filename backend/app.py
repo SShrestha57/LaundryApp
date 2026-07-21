@@ -289,10 +289,11 @@ def list_bookings():
 
 @app.post("/bookings")
 def create_booking():
-    """Create a booking using the sp_book_machine stored procedure."""
+    """Create a booking using the sp_book_machine stored procedure.
 
-    A BEFORE INSERT trigger validates the booking (same building,
-    machine operational, no overlapping reservation).
+    A BEFORE INSERT trigger validates the booking: the user and machine
+    must belong to the same building, the machine must be operational,
+    and the reservation must not overlap an existing booking.
     """
     data = get_body()
 
