@@ -70,7 +70,7 @@ def seed():
         (2, 1, "washer", 3.00, 30, "active"),
         (2, 2, "dryer", 2.75, 40, "active"),
         (3, 1, "washer", 2.25, 35, "active"),
-        (3, 2, "dryer", 2.25, 40, "maintenance"),
+        (3, 2, "dryer", 2.25, 40, "active"),
     ]:
         db.execute(
             "INSERT INTO machines "
