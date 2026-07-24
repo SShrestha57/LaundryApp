@@ -80,6 +80,8 @@ def test_booking_respects_machine_operational_status(client):
     assert m2["status"] == "active"
 
     # A booking on a machine under maintenance is rejected by the DB trigger.
+    # Put machine 6 under maintenance first so the test does not depend on seed data.
+    client.patch("/machines/6", json={"status": "maintenance"})
     rejected = client.post("/bookings", json={
         "user_id": 5, "machine_id": 6,
         "start_time": "2026-07-09 10:00:00", "end_time": "2026-07-09 10:30:00",

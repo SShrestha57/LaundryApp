@@ -61,11 +61,6 @@ def require(data, *fields):
     missing = [f for f in fields if data.get(f) in (None, "")]
     if missing:
         raise ApiError(400, "missing required field(s): " + ", ".join(missing))
-    
-def require(data, *fields):
-    missing = [f for f in fields if data.get(f) in (None, "")]
-    if missing:
-        raise ApiError(400, "missing required field(s): " + ", ".join(missing))
 
 
 def serialize_booking(row):
