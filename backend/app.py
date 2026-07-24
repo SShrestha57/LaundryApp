@@ -61,6 +61,20 @@ def require(data, *fields):
     missing = [f for f in fields if data.get(f) in (None, "")]
     if missing:
         raise ApiError(400, "missing required field(s): " + ", ".join(missing))
+    
+def require(data, *fields):
+    missing = [f for f in fields if data.get(f) in (None, "")]
+    if missing:
+        raise ApiError(400, "missing required field(s): " + ", ".join(missing))
+
+
+def serialize_booking(row):
+    row = dict(row)
+    if row.get("start_time") is not None:
+        row["start_time"] = row["start_time"].strftime("%Y-%m-%d %H:%M:%S")
+    if row.get("end_time") is not None:
+        row["end_time"] = row["end_time"].strftime("%Y-%m-%d %H:%M:%S")
+    return row
 
 
 # ---------------------------------------------------------------------------
@@ -139,18 +153,16 @@ def login():
 
 @app.get("/users/<int:user_id>/bookings")
 def user_bookings(user_id):
-    return jsonify(
-        db.query(
-            "SELECT b.booking_id, m.machine_id, m.machine_number, m.machine_type, "
-            "b.start_time, b.end_time, b.price_at_booking, b.booking_status "
-            "FROM bookings b "
-            "JOIN machines m ON b.machine_id = m.machine_id "
-            "WHERE b.user_id = %s "
-            "ORDER BY b.start_time DESC",
-            (user_id,),
-        )
+    rows = db.query(
+        "SELECT b.booking_id, m.machine_id, m.machine_number, m.machine_type, "
+        "b.start_time, b.end_time, b.price_at_booking, b.booking_status "
+        "FROM bookings b "
+        "JOIN machines m ON b.machine_id = m.machine_id "
+        "WHERE b.user_id = %s "
+        "ORDER BY b.start_time DESC",
+        (user_id,),
     )
-
+    return jsonify([serialize_booking(r) for r in rows])
 
 # ---------------------------------------------------------------------------
 # Machines
@@ -275,16 +287,15 @@ def create_subscription():
 # ---------------------------------------------------------------------------
 @app.get("/bookings")
 def list_bookings():
-    return jsonify(
-        db.query(
-            "SELECT b.booking_id, u.name AS tenant, m.machine_type, "
-            "b.start_time, b.end_time, b.price_at_booking, b.booking_status "
-            "FROM bookings b "
-            "JOIN users u ON b.user_id = u.user_id "
-            "JOIN machines m ON b.machine_id = m.machine_id "
-            "ORDER BY b.booking_id"
-        )
+    rows = db.query(
+        "SELECT b.booking_id, u.name AS tenant, m.machine_type, "
+        "b.start_time, b.end_time, b.price_at_booking, b.booking_status "
+        "FROM bookings b "
+        "JOIN users u ON b.user_id = u.user_id "
+        "JOIN machines m ON b.machine_id = m.machine_id "
+        "ORDER BY b.booking_id"
     )
+    return jsonify([serialize_booking(r) for r in rows])
 
 
 @app.post("/bookings")
@@ -374,7 +385,7 @@ def get_booking(booking_id):
     )
     if not row:
         return jsonify(error="booking not found"), 404
-    return jsonify(row)
+    return jsonify(serialize_booking(row))
 
 
 # ---------------------------------------------------------------------------
