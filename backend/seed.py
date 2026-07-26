@@ -49,7 +49,7 @@ def seed():
         db.execute("INSERT INTO buildings (name, address) VALUES (%s, %s)",
                    (name, address))
 
-    # Users -> ids 1..5
+    # Users -> ids 1..6
     for building_id, name, email, role in [
         (1, "Alhassana Diallo", "adiallo@citymail.cuny.edu", "tenant"),
         (1, "Maria Lopez", "mlopez@example.com", "tenant"),
@@ -112,7 +112,7 @@ def seed():
         (1, 1, "2026-07-07 08:00:00", "2026-07-07 08:30:00", 2.50, "confirmed"),
         (2, 2, "2026-07-07 09:00:00", "2026-07-07 09:45:00", 2.00, "completed"),
         (4, 3, "2026-07-07 10:00:00", "2026-07-07 10:30:00", 3.00, "confirmed"),
-        (5, 5, "2026-07-08 11:00:00", "2026-07-08 11:35:00", 2.25, "completed"),
+        (6, 5, "2026-07-08 11:00:00", "2026-07-08 11:35:00", 2.25, "completed"),
         (2, 1, "2026-07-08 12:00:00", "2026-07-08 12:30:00", 2.50, "cancelled"),
     ]:
         db.execute(
@@ -158,6 +158,6 @@ def seed():
 if __name__ == "__main__":
     reset()
     seed()
-    print("Seeded: 3 buildings, 5 users, 6 machines, 3 plans, 3 subscriptions, "
+    print("Seeded: 3 buildings, 6 users, 6 machines, 3 plans, 3 subscriptions, "
           "5 bookings, 5 booking payments, 3 subscription payments.")
     print(f'All demo users log in with password: "{DEMO_PASSWORD}"')
