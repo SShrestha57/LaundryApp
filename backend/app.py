@@ -355,14 +355,30 @@ def create_booking():
 
 @app.delete("/bookings/<int:booking_id>")
 def cancel_booking(booking_id):
-    result = db.execute(
+    booking = db.query(
+        "SELECT machine_id FROM bookings WHERE booking_id = %s",
+        (booking_id,),
+        fetchone=True,
+    )
+
+    if not booking:
+        return jsonify(error="booking not found"), 404
+
+    db.execute(
         "UPDATE bookings SET booking_status = 'cancelled' WHERE booking_id = %s",
         (booking_id,),
     )
-    if result["rowcount"] == 0:
-        return jsonify(error="booking not found"), 404
-    return jsonify(booking_id=booking_id, booking_status="cancelled")
 
+    db.execute(
+        "UPDATE machines SET status = 'active' WHERE machine_id = %s",
+        (booking["machine_id"],),
+    )
+
+    return jsonify(
+        booking_id=booking_id,
+        booking_status="cancelled",
+        machine_status="active",
+    )
 
 @app.get("/bookings/<int:booking_id>")
 def get_booking(booking_id):

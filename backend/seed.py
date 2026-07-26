@@ -53,6 +53,7 @@ def seed():
     for building_id, name, email, role in [
         (1, "Alhassana Diallo", "adiallo@citymail.cuny.edu", "tenant"),
         (1, "Maria Lopez", "mlopez@example.com", "tenant"),
+        (1, "Maple Manager", "maplemanager@example.com", "manager"),
         (2, "James Carter", "jcarter@example.com", "manager"),
         (2, "Wei Chen", "wchen@example.com", "tenant"),
         (3, "Fatima Noor", "fnoor@example.com", "manager"),
