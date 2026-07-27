@@ -5,6 +5,7 @@ All queries are parameterized to prevent SQL injection.
 """
 
 from io import BytesIO
+from datetime import date
 
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
@@ -430,21 +431,71 @@ def create_booking_payment():
 @app.post("/subscription-payments")
 def create_subscription_payment():
     data = get_body()
-    require(data, "subscription_id", "amount", "billing_period_start",
-            "billing_period_end")
+    require(
+        data,
+        "subscription_id",
+        "amount",
+        "billing_period_start",
+        "billing_period_end",
+    )
+
+    try:
+        amount = float(data["amount"])
+    except (TypeError, ValueError):
+        raise ApiError(400, "amount must be a number")
+
+    if amount <= 0:
+        raise ApiError(400, "amount must be positive")
+
+    payment_status = str(
+        data.get("payment_status", "paid")
+    ).strip().lower()
+
+    allowed_statuses = {"paid", "pending", "refunded"}
+
+    if payment_status not in allowed_statuses:
+        raise ApiError(
+            400,
+            "payment_status must be one of: paid, pending, refunded",
+        )
+
+    try:
+        billing_period_start = date.fromisoformat(
+            str(data["billing_period_start"])
+        )
+        billing_period_end = date.fromisoformat(
+            str(data["billing_period_end"])
+        )
+    except ValueError:
+        raise ApiError(
+            400,
+            "billing period dates must use YYYY-MM-DD",
+        )
+
+    if billing_period_end < billing_period_start:
+        raise ApiError(
+            400,
+            "billing_period_end must be on or after "
+            "billing_period_start",
+        )
+
     result = db.execute(
         "INSERT INTO subscription_payments "
         "(subscription_id, amount, payment_status, payment_date, "
         "billing_period_start, billing_period_end) "
         "VALUES (%s, %s, %s, NOW(), %s, %s)",
         (
-            data["subscription_id"], data["amount"],
-            data.get("payment_status", "paid"),
-            data["billing_period_start"], data["billing_period_end"],
+            data["subscription_id"],
+            amount,
+            payment_status,
+            billing_period_start.isoformat(),
+            billing_period_end.isoformat(),
         ),
     )
-    return jsonify(subscription_payment_id=result["lastrowid"]), 201
 
+    return jsonify(
+        subscription_payment_id=result["lastrowid"]
+    ), 201
 
 # ---------------------------------------------------------------------------
 # Revenue report + Excel export (both streams)

@@ -162,3 +162,63 @@ def test_booking_missing_machine_id_returns_400(client):
         "price_at_booking": 2.00,
     })
     assert res.status_code == 400
+
+def test_valid_subscription_payment_created(client):
+    """A valid subscription payment should be accepted."""
+    res = client.post("/subscription-payments", json={
+        "subscription_id": 1,
+        "amount": 49.00,
+        "payment_status": "pending",
+        "billing_period_start": "2026-08-01",
+        "billing_period_end": "2026-08-31",
+    })
+
+    assert res.status_code == 201
+    assert "subscription_payment_id" in res.get_json()
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected_error"),
+    [
+        (
+            {
+                "subscription_id": 1,
+                "amount": -99.00,
+                "payment_status": "paid",
+                "billing_period_start": "2026-08-01",
+                "billing_period_end": "2026-08-31",
+            },
+            "amount must be positive",
+        ),
+        (
+            {
+                "subscription_id": 1,
+                "amount": 49.00,
+                "payment_status": "paid",
+                "billing_period_start": "2026-08-31",
+                "billing_period_end": "2026-08-01",
+            },
+            "billing_period_end must be on or after billing_period_start",
+        ),
+        (
+            {
+                "subscription_id": 1,
+                "amount": 49.00,
+                "payment_status": "declined",
+                "billing_period_start": "2026-08-01",
+                "billing_period_end": "2026-08-31",
+            },
+            "payment_status must be one of: paid, pending, refunded",
+        ),
+    ],
+)
+def test_invalid_subscription_payment_rejected(
+    client,
+    payload,
+    expected_error,
+):
+    """Invalid subscription payment data should return HTTP 400."""
+    res = client.post("/subscription-payments", json=payload)
+
+    assert res.status_code == 400
+    assert expected_error in res.get_json()["error"]
